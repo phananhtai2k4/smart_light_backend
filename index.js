@@ -408,3 +408,17 @@ client.on("message", async (topic, message) => {
     }
   }
 });
+
+// Mở một HTTP server nhỏ nhắm mục đích pass health check của Render
+const http = require("http");
+const PORT = process.env.PORT || 3000;
+http
+  .createServer((req, res) => {
+    res.writeHead(200, { "Content-Type": "text/plain" });
+    res.end("Smart Light Backend is running successfully!\n");
+  })
+  .listen(PORT, () => {
+    console.log(
+      `HTTP Server đang lắng nghe trên port ${PORT} (Dành cho Render Deployment)`,
+    );
+  });
