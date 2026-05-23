@@ -22,6 +22,9 @@ try {
   console.error("Lỗi khi khởi tạo Firebase Admin SDK:", error.message);
 }
 
+const db = admin.firestore();
+const rtdb = admin.database();
+
 // Kết nối MQTT
 const options = {
   username: process.env.MQTT_USERNAME,
@@ -31,20 +34,63 @@ const client = mqtt.connect(process.env.MQTT_BROKER_URL, options);
 
 console.log("Đang cố gắng kết nối đến:", process.env.MQTT_BROKER_URL);
 
+let subscribedTopics = new Set();
+
 client.on("connect", () => {
   console.log("Đã kết nối HiveMQ");
-  client.subscribe(process.env.MQTT_TOPIC, (err) => {
-    if (err) console.error("Lỗi khi subscribe:", err);
-    else console.log("Subscribed đến topic:", process.env.MQTT_TOPIC);
-  });
+
+  // Lắng nghe snapshot từ gateways để cập nhật topic cần subscribe
+  db.collection("gateways").onSnapshot(
+    (snapshot) => {
+      const currentTopics = new Set();
+
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        if (data.topicAlert) {
+          currentTopics.add(data.topicAlert);
+        }
+      });
+
+      // Subscribe các topic mới
+      currentTopics.forEach((topic) => {
+        if (!subscribedTopics.has(topic)) {
+          client.subscribe(topic, (err) => {
+            if (err) {
+              console.error(`Lỗi khi subscribe topic ${topic}:`, err);
+            } else {
+              console.log(`Subscribed đến topic: ${topic}`);
+              subscribedTopics.add(topic);
+            }
+          });
+        }
+      });
+
+      // Unsubscribe các topic không còn sử dụng
+      subscribedTopics.forEach((topic) => {
+        if (!currentTopics.has(topic)) {
+          client.unsubscribe(topic, (err) => {
+            if (err) {
+              console.error(`Lỗi khi unsubscribe topic ${topic}:`, err);
+            } else {
+              console.log(`Unsubscribed topic: ${topic}`);
+              subscribedTopics.delete(topic);
+            }
+          });
+        }
+      });
+    },
+    (error) => {
+      console.error(
+        "Lỗi khi lắng nghe changes trên collection gateways:",
+        error,
+      );
+    },
+  );
 });
 
 client.on("error", (err) => {
   console.error("Lỗi khi kết nối MQTT:", err.message);
 });
-
-const db = admin.firestore();
-const rtdb = admin.database();
 
 const nodeMacCache = {};
 
