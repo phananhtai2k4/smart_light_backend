@@ -394,6 +394,65 @@ client.on("message", async (topic, message) => {
             onoff: isOn,
           });
         console.log(`Đã lưu history của Node ${nodeMac}`);
+
+        // 4. Bắn thông báo FCM cho điện thoại nếu phát hiện dòng rò (history_type = 2)
+        if (history_type === 2) {
+          try {
+            const nodeDoc = await db.collection("nodes").doc(nodeMac).get();
+            if (nodeDoc.exists) {
+              const nodeData = nodeDoc.data();
+              const deviceName = nodeData.name || "đèn";
+              const gatewayMac = nodeData.gatewayMac || devExtAddr;
+
+              const gatewayDoc = await db.collection("gateways").doc(String(gatewayMac)).get();
+              if (gatewayDoc.exists) {
+                const gatewayData = gatewayDoc.data();
+                const fcmTokens = gatewayData.fcm_tokens || [];
+
+                if (Array.isArray(fcmTokens) && fcmTokens.length > 0) {
+                  console.log(`Đang gửi thông báo dòng rò cho thiết bị ${deviceName} tới các fcm_tokens của Gateway ${gatewayMac}...`);
+                  const sendPromises = fcmTokens.map((fcmToken) => {
+                    const message = {
+                      notification: {
+                        title: '🚨 CẢNH BÁO NGUY HIỂM 🚨',
+                        body: `Phát hiện DÒNG RÒ tại thiết bị ${deviceName}! Hệ thống đã ngắt điện.`,
+                        imageUrl: "https://media.istockphoto.com/id/2161567287/vector/high-voltage-yellow-triangle-warning-sign-symbol-caution-electric-shock-danger-icon-vector.jpg?s=1024x1024&w=is&k=20&c=3E1DXntKlFTrwdnozw9_GzN7MkY2jW2TJP6k3pGoRnM="
+                      },// BẮT BUỘC BỔ SUNG: Cấu hình riêng cho Android hiển thị khẩn cấp
+                      android: {
+                        priority: 'high', // Bắn thông báo ngay lập tức, không delay để tiết kiệm pin
+                        notification: {
+                          channelId: 'fcm_fallback_notification_channel', // Kênh mặc định mà Firebase SDK tạo ra trong Flutter
+                          sound: 'default', // Bật tiếng chuông mặc định của máy
+                          priority: 'max', // Đảm bảo hiển thị thành banner nổi lên đầu màn hình (Heads-up)
+                          visibility: 'public' // Hiển thị đầy đủ nội dung ngay cả trên màn hình khóa
+                        }
+                      },
+                      token: fcmToken
+                    };
+
+                    // Gửi bản tin đi
+                    return admin.messaging().send(message)
+                      .then((response) => {
+                        console.log(`Đã gửi thông báo FCM thành công đến token ${fcmToken}:`, response);
+                      })
+                      .catch((error) => {
+                        console.error(`Lỗi khi gửi thông báo FCM đến token ${fcmToken}:`, error);
+                      });
+                  });
+                  await Promise.all(sendPromises);
+                } else {
+                  console.log(`Gateway ${gatewayMac} không có fcm_tokens nào.`);
+                }
+              } else {
+                console.log(`Không tìm thấy gateway với MAC ${gatewayMac} để gửi thông báo FCM.`);
+              }
+            } else {
+              console.log(`Không tìm thấy node document ${nodeMac} trong Firestore để lấy thông tin FCM.`);
+            }
+          } catch (fcmError) {
+            console.error("Lỗi trong quá trình gửi thông báo FCM dòng rò:", fcmError);
+          }
+        }
       } else {
         console.log(
           `Không tìm thấy node với Address ${address} thuộc Gateway ${devExtAddr}`,
