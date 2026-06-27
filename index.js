@@ -416,7 +416,7 @@ client.on("message", async (topic, message) => {
                       notification: {
                         title: '🚨 CẢNH BÁO NGUY HIỂM 🚨',
                         body: `Phát hiện DÒNG RÒ tại thiết bị ${deviceName}! Hệ thống đã ngắt điện.`,
-                        imageUrl: "https://media.istockphoto.com/id/2161567287/vector/high-voltage-yellow-triangle-warning-sign-symbol-caution-electric-shock-danger-icon-vector.jpg?s=1024x1024&w=is&k=20&c=3E1DXntKlFTrwdnozw9_GzN7MkY2jW2TJP6k3pGoRnM="
+                        imageUrl: "https://media.istockphoto.com/id/1165326519/vector/electricity-badge.jpg?s=170667a&w=0&k=20&c=mA9qI1Iq4074rgVuNN5kvm6Pr0ROzZPgSrYWnaYxGRs="
                       },// BẮT BUỘC BỔ SUNG: Cấu hình riêng cho Android hiển thị khẩn cấp
                       android: {
                         priority: 'high', // Bắn thông báo ngay lập tức, không delay để tiết kiệm pin
