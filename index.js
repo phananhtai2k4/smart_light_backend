@@ -378,22 +378,32 @@ client.on("message", async (topic, message) => {
         });
 
         // 2. Cập nhật state và online trên Firestore
-        await db.collection("nodes").doc(nodeMac).update({
-          online: true,
-          state_on: isOn,
-        });
-
-        // 3. Lưu mốc lịch sử event
-        await db
-          .collection("nodes")
-          .doc(nodeMac)
-          .collection("events")
-          .add({
-            timestamp: admin.firestore.Timestamp.fromMillis(timestamp * 1000),
-            type: history_type,
-            onoff: isOn,
+        try {
+          await db.collection("nodes").doc(nodeMac).update({
+            online: true,
+            state_on: isOn,
           });
-        console.log(`Đã lưu history của Node ${nodeMac}`);
+
+          // 3. Lưu mốc lịch sử event
+          await db
+            .collection("nodes")
+            .doc(nodeMac)
+            .collection("events")
+            .add({
+              timestamp: admin.firestore.Timestamp.fromMillis(timestamp * 1000),
+              type: history_type,
+              onoff: isOn,
+            });
+          console.log(`Đã lưu history của Node ${nodeMac}`);
+        } catch (err) {
+          if (err.code === 5) { // 5: NOT_FOUND
+            console.warn(`[Firestore] Node ${nodeMac} không tồn tại trên Firestore (có thể đã bị xoá). Tiến hành xoá cache.`);
+            delete nodeMacCache[`${devExtAddr}_${address}`];
+            return; // Dừng xử lý tiếp (không gửi FCM nữa)
+          } else {
+            throw err;
+          }
+        }
 
         // 4. Bắn thông báo FCM cho điện thoại nếu phát hiện dòng rò (history_type = 2)
         if (history_type === 2) {
